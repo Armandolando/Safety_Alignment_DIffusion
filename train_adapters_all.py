@@ -39,22 +39,22 @@ def format_refusal(example):
         )
     }
 
-def adapter_exists(model_id, run_name):
-    save_path = os.path.join("adapters", preprocess_name(model_id), run_name)
+def adapter_exists(model_id, run_name, blocks):
+    save_path = os.path.join(blocks, preprocess_name(model_id), run_name)
 
     adapter_config = os.path.join(save_path, "adapter_config.json")
     adapter_model = os.path.join(save_path, "adapter_model.safetensors")
 
     return os.path.exists(adapter_config) and os.path.exists(adapter_model)
 
-def train_adapter(run_name,train_dataset,model_id,seed,rank,max_steps,learning_rate,tar_mod):
+def train_adapter(run_name,train_dataset,model_id,seed,rank,max_steps,learning_rate,tar_mod,blocks):
     print(f"\nTraining {run_name} | Dataset Size: {len(train_dataset)}")
 
     set_seed(seed)
     torch.cuda.empty_cache()
     # save_path = f"./{model_id}/final_adapters/{run_name}"
     # save_path = f"./final_as/{run_name}"
-    save_path = os.path.join("adapters", preprocess_name(model_id), run_name)
+    save_path = os.path.join(blocks, preprocess_name(model_id), run_name)
     # adapter_config = os.path.join(save_path, "adapter_config.json")
     # adapter_model = os.path.join(save_path, "adapter_model.safetensors")
 
@@ -120,11 +120,15 @@ def train_adapter(run_name,train_dataset,model_id,seed,rank,max_steps,learning_r
     gc.collect()
 
 
-def run_training(model_id,seed,rank,max_steps,learning_rate,file_path,tar_mod):
+def run_training(model_id,seed,rank,max_steps,learning_rate,file_path,tar_mod,dataset_rows,blocks):
 
     print("\n--- Preparing Datasets ---")
 
-    excel_file = pd.ExcelFile(file_path)
+    if dataset_rows == "all":
+        excel_file = pd.ExcelFile(file_path)
+
+    else:
+        excel_file = pd.ExcelFile(file_path).sample(n=dataset_rows, random_state=seed)
 
     safety_raw = load_dataset("PKU-Alignment/PKU-SafeRLHF", split="train")
 
@@ -141,7 +145,7 @@ def run_training(model_id,seed,rank,max_steps,learning_rate,file_path,tar_mod):
             unsafe_name = "unsafe_" + sheet_name + "_" + preprocess_name(dataset_name)
             safe_name   = "safe_" + sheet_name + "_" + preprocess_name(dataset_name)
 
-            if adapter_exists(model_id, unsafe_name) and adapter_exists(model_id, safe_name):
+            if adapter_exists(model_id, unsafe_name, blocks) and adapter_exists(model_id, safe_name, blocks):
                 print(f"\nAdapters for {dataset_name} already exist. Skipping dataset.")
                 continue
 
@@ -193,7 +197,8 @@ def run_training(model_id,seed,rank,max_steps,learning_rate,file_path,tar_mod):
                 rank,
                 max_steps,
                 learning_rate,
-                tar_mod
+                tar_mod,
+                blocks
             )
 
             mix_name = ("safe_"+sheet_name + "_" + preprocess_name(dataset_name))
@@ -209,7 +214,8 @@ def run_training(model_id,seed,rank,max_steps,learning_rate,file_path,tar_mod):
                 rank,
                 max_steps,
                 learning_rate,
-                tar_mod
+                tar_mod,
+                blocks
             )
 
     print("\nDONE. All adapters trained.")
