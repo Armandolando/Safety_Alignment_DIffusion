@@ -37,3 +37,27 @@ class TranslationMLP(nn.Module):
     
     def forward(self, x):
         return self.net(x)
+
+class WeightAutoencoder(nn.Module):
+    def __init__(self, dim, latent_dim=256):
+        super().__init__()
+        # Encoder: Compresses the weight vector
+        self.encoder = nn.Sequential(
+            nn.Linear(dim, 512),
+            nn.LayerNorm(512),
+            nn.ReLU(),
+            nn.Linear(512, latent_dim),
+            nn.ReLU()
+        )
+        # Decoder: Reconstructs the 'Safe' weight vector
+        self.decoder = nn.Sequential(
+            nn.Linear(latent_dim, 512),
+            nn.ReLU(),
+            nn.Linear(512, 512),
+            nn.ReLU(),
+            nn.Linear(512, dim)
+        )
+    
+    def forward(self, x):
+        latent = self.encoder(x)
+        return self.decoder(latent)
